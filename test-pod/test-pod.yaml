@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-pod
+  labels:
+    app: test-pod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-pod
+  template:
+    metadata:
+      labels:
+        app: test-pod
+    spec:
+      containers:
+      - name: test-pod
+        image: nmatsui/test-logging-api:latest
+        ports:
+        - containerPort: 3030
+          name: test-pod
