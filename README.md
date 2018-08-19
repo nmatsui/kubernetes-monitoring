@@ -311,6 +311,18 @@ logging: [Elasticsearch](https://www.elastic.co/jp/products/elasticsearch) & [fl
     * Index Pattern: `logstash-*`
     * Time filter field: `@timestamp`
 
+### add Elasticsearch as a Datasource to Grafana
+1. open Configuration -> DataSource and add a DataSource connecting to Elasticsearch
+    * name: `elasticsearch`
+    * Type: `Elasticsearch`
+    * URL: `http://elasticsearch-logging:9200/`
+    * Access: `Server(Default)`
+    * Index name: `logstash-*`
+    * Time field nama: `@timestamp`
+    * Version: `5.6+`
+1. import `monitoring/dashboard_elasticsearch.json` to add `Elasticsearch` dashboard
+1. When you open `Elasticsearch` dashboard, you can see the raw Elasticsearch log table and log count graph
+
 
 ## License
 
