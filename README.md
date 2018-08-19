@@ -33,7 +33,7 @@ logging: [Elasticsearch](https://www.elastic.co/jp/products/elasticsearch) & [fl
     ```bash
     $ helm repo add coreos https://s3-eu-west-1.amazonaws.com/coreos-charts/stable/
     ```
-1. confirm that tiller launched successfully
+1. confirm that a tiller is launched successfully
 
     ```bash
     $ kubectl get pod --namespace kube-system -l app=helm -l name=tiller
@@ -62,7 +62,7 @@ logging: [Elasticsearch](https://www.elastic.co/jp/products/elasticsearch) & [fl
     ```bash
     $ helm install coreos/kube-prometheus --name pg --namespace monitoring -f monitoring/kube-prometheus-azure.yaml
     ```
-1.  confirm that Prometheus and Grafana launched
+1.  confirm that Prometheus and Grafana is launched
     * confirm that AlertManager is launched successfully
 
         ```bash
@@ -84,11 +84,11 @@ logging: [Elasticsearch](https://www.elastic.co/jp/products/elasticsearch) & [fl
         ```bash
         $ kubectl get pods --namespace monitoring -l app=pg-grafana
         ```
-    * confirm that node-exporter launched successfully on each node
+    * confirm that node-exporter is launched successfully on each node
 
         ```bash
         $ kubectl get daemonsets --namespace monitoring
-        $ kubectl get pods -o wide -n monitoring -l app=pg-exporter-node
+        $ kubectl get pods --namespace monitoring -l app=pg-exporter-node -o wide
         ```
 
 ### patch some resources to adapt Azure AKS
@@ -198,7 +198,7 @@ logging: [Elasticsearch](https://www.elastic.co/jp/products/elasticsearch) & [fl
     -        severity: critical
     ```
 
-### confirm Prometheus
+### show Prometheus Dashboard
 1. port forward to prometheus
 
     ```bash
@@ -207,7 +207,7 @@ logging: [Elasticsearch](https://www.elastic.co/jp/products/elasticsearch) & [fl
 1. open http://localhost:9090/targets and confirm that no `State` is down
 1. open http://localhost:9090/alerts and confirm that no `Alert` is fired
 
-### confirm Grafana
+### show Grafana Dashboard
 1. port forward to grafana
 
     ```bash
@@ -220,6 +220,97 @@ logging: [Elasticsearch](https://www.elastic.co/jp/products/elasticsearch) & [fl
     * Unfortunately, the status of Control Plane is N/A because the exporter of kubernetes control plane has been deleted above
 1. add a dashboard to show the capacity of persistent volumes
     * import `monitoring/dashboard_persistent_volumes.json`
+
+### prepare Elasticsearch & Fluentd & Kibana
+1. install Elasticsearch
+
+    ```bash
+    $ kubectl apply -f logging/es-statefulset.yaml
+    $ kubectl apply -f logging/es-service.yaml
+    ```
+1. confirm that Elasticsearch is launched
+    * confirm that a StatefulSet is running successfully
+
+        ```bash
+        $ kubectl get statefulsets --namespace monitoring -l k8s-app=elasticsearch-logging
+        ```
+    * confirm that two Pods are running successfully
+
+        ```bash
+        $ kubectl get pods --namespace monitoring -l k8s-app=elasticsearch-logging
+        ```
+    * confirm that two PersistentVolumeClaims are running successfully
+
+        ```bash
+        $ kubectl get persistentvolumeclaims --namespace monitoring -l k8s-app=elasticsearch-logging
+        ```
+    * confirm that a Service is running successfully
+
+        ```bash
+        $ kubectl get services --namespace monitoring -l k8s-app=elasticsearch-logging
+        ```
+1. enable routing allocation of Elasticsearch cluster
+
+    ```bash
+    $ kubectl exec -it elasticsearch-logging-0 --namespace monitoring -- curl -H "Content-Type: application/json" -X PUT http://elasticsearch-logging:9200/_cluster/settings -d '{"transient": {"cluster.routing.allocation.enable":"all"}}'
+    ```
+1. install Fluentd
+
+    ```bash
+    $ kubectl apply -f logging/fluentd-es-configmap.yaml
+    $ kubectl apply -f logging/fluentd-es-ds.yaml
+    ```
+1. confirm that a DaemonSet is running and a pod is running successfully on each node
+
+    ```bash
+    $ kubectl get daemonsets --namespace monitoring -l k8s-app=fluentd-es
+    $ kubectl get pods --namespace monitoring -l k8s-app=fluentd-es -o wide
+    ```
+1. install Kibana
+
+    ```bash
+    $ kubectl apply -f logging/kibana-deployment.yaml
+    $ kubectl apply -f logging/kibana-service.yaml
+    ```
+1. confirm that Kibana is launched successfully
+    * confirm that a Deployment is running successfully
+
+        ```bash
+        $ kubectl get deployments --namespace monitoring -l k8s-app=kibana-logging
+        ```
+    * confirm that a Pod is running successfully
+
+        ```bash
+        $ kubectl get pods --namespace monitoring -l k8s-app=kibana-logging
+        ```
+    * confirm that a Service is running successfully
+
+        ```bash
+        $ kubectl get services --namespace monitoring -l k8s-app=kibana-logging
+        ```
+1. install Curator
+
+    ```bash
+    $ kubectl apply -f logging/curator-configmap.yaml
+    $ kubectl apply -f logging/curator-cronjob.yaml
+    ```
+1. confirm that a CronJob of Curator is registered
+
+    ```bash
+    $ kubectl get cronjobs --namespace monitoring -l k8s-app=elasticsearch-curator
+    ```
+
+### show Kibana Dashboard
+1. port forward to kibana
+
+    ```bash
+    $ kubectl port-forward $(kubectl get pod --namespace monitoring -l k8s-app=kibana-logging -o template --template "{{(index .items 0).metadata.name}}") --namespace monitoring 5601:5601
+    ```
+1. open http://localhost:5601
+1. set up index from "Management -> Index Patterns"
+    * Index Pattern: `logstash-*`
+    * Time filter field: `@timestamp`
+
 
 ## License
 
